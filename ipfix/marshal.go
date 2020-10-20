@@ -33,7 +33,7 @@ import (
 var errUknownMarshalDataType = errors.New("unknown data type to marshal")
 
 // JSONMarshal encodes IPFIX message
-func (m *Message) JSONMarshal(b *bytes.Buffer) ([]byte, error) {
+func (m *Message) JSONMarshal(b *bytes.Buffer, dataset_index int) ([]byte, error) {
 	b.WriteString("{")
 
 	// encode agent id
@@ -42,8 +42,8 @@ func (m *Message) JSONMarshal(b *bytes.Buffer) ([]byte, error) {
 	// encode header
 	m.encodeHeader(b)
 
-	// encode data sets
-	if err := m.encodeDataSet(b); err != nil {
+	// encode data set
+	if err := m.encodeDataSet(b, dataset_index); err != nil {
 		return nil, err
 	}
 
@@ -52,90 +52,68 @@ func (m *Message) JSONMarshal(b *bytes.Buffer) ([]byte, error) {
 	return b.Bytes(), nil
 }
 
-func (m *Message) encodeDataSet(b *bytes.Buffer) error {
+func (m *Message) encodeDataSet(b *bytes.Buffer, i int) error {
 	var (
 		length   int
-		dsLength int
 		err      error
 	)
 
-	b.WriteString("\"DataSets\":")
-	dsLength = len(m.DataSets)
+	length = len(m.DataSets[i])
 
-	b.WriteByte('[')
+	for j := range m.DataSets[i] {
+		b.WriteByte('"')
+		b.WriteString(strconv.FormatInt(int64(m.DataSets[i][j].EnterpriseNo), 10))
+		b.WriteByte('-')
+		b.WriteString(strconv.FormatInt(int64(m.DataSets[i][j].ID), 10))
+		b.WriteString("\":")
+		err = m.writeValue(b, i, j)
 
-	for i := range m.DataSets {
-		length = len(m.DataSets[i])
-
-		b.WriteByte('[')
-		for j := range m.DataSets[i] {
-			b.WriteString("{\"I\":")
-			b.WriteString(strconv.FormatInt(int64(m.DataSets[i][j].ID), 10))
-			b.WriteString(",\"V\":")
-			err = m.writeValue(b, i, j)
-
-			if m.DataSets[i][j].EnterpriseNo != 0 {
-				b.WriteString(",\"E\":")
-				b.WriteString(strconv.FormatInt(int64(m.DataSets[i][j].EnterpriseNo), 10))
-			}
-
-			if j < length-1 {
-				b.WriteString("},")
-			} else {
-				b.WriteByte('}')
-			}
-		}
-
-		if i < dsLength-1 {
-			b.WriteString("],")
-		} else {
-			b.WriteByte(']')
-		}
-	}
-
-	b.WriteByte(']')
-
-	return err
-}
-
-func (m *Message) encodeDataSetFlat(b *bytes.Buffer) error {
-	var (
-		length   int
-		dsLength int
-		err      error
-	)
-
-	b.WriteString("\"DataSets\":")
-	dsLength = len(m.DataSets)
-
-	b.WriteByte('[')
-
-	for i := range m.DataSets {
-		length = len(m.DataSets[i])
-
-		b.WriteByte('{')
-		for j := range m.DataSets[i] {
-			b.WriteByte('"')
-			b.WriteString(strconv.FormatInt(int64(m.DataSets[i][j].ID), 10))
-			b.WriteString("\":")
-			err = m.writeValue(b, i, j)
-
-			if j < length-1 {
-				b.WriteByte(',')
-			} else {
-				b.WriteByte('}')
-			}
-		}
-
-		if i < dsLength-1 {
+		if j < length-1 {
 			b.WriteString(",")
 		}
 	}
 
-	b.WriteByte(']')
-
 	return err
 }
+
+// func (m *Message) encodeDataSetFlat(b *bytes.Buffer) error {
+// 	var (
+// 		length   int
+// 		dsLength int
+// 		err      error
+// 	)
+
+// 	b.WriteString("\"DataSets\":")
+// 	dsLength = len(m.DataSets)
+
+// 	b.WriteByte('[')
+
+// 	for i := range m.DataSets {
+// 		length = len(m.DataSets[i])
+
+// 		b.WriteByte('{')
+// 		for j := range m.DataSets[i] {
+// 			b.WriteByte('"')
+// 			b.WriteString(strconv.FormatInt(int64(m.DataSets[i][j].ID), 10))
+// 			b.WriteString("\":")
+// 			err = m.writeValue(b, i, j)
+
+// 			if j < length-1 {
+// 				b.WriteByte(',')
+// 			} else {
+// 				b.WriteByte('}')
+// 			}
+// 		}
+
+// 		if i < dsLength-1 {
+// 			b.WriteString(",")
+// 		}
+// 	}
+
+// 	b.WriteByte(']')
+
+// 	return err
+// }
 
 func (m *Message) encodeHeader(b *bytes.Buffer) {
 	b.WriteString("\"Header\":{\"Version\":")
