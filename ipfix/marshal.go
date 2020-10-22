@@ -59,11 +59,11 @@ func (m *Message) encodeDataSet(b *bytes.Buffer, i int) error {
 	)
 
 	length = len(m.DataSets[i])
-
+	b.WriteString("\"Data\":{")
 	for j := range m.DataSets[i] {
 		b.WriteByte('"')
 		b.WriteString(strconv.FormatInt(int64(m.DataSets[i][j].EnterpriseNo), 10))
-		b.WriteByte('-')
+		b.WriteByte('_')
 		b.WriteString(strconv.FormatInt(int64(m.DataSets[i][j].ID), 10))
 		b.WriteString("\":")
 		err = m.writeValue(b, i, j)
@@ -72,6 +72,7 @@ func (m *Message) encodeDataSet(b *bytes.Buffer, i int) error {
 			b.WriteString(",")
 		}
 	}
+	b.WriteString("}")
 
 	return err
 }
