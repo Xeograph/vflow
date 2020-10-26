@@ -74,7 +74,7 @@ type TemplateFieldSpecifier struct {
 type Message struct {
 	AgentID  string
 	Header   MessageHeader
-	DataSets [][]DecodedField
+	DataSets []map[ElementKey][]DecodedField
 }
 
 // DecodedField represents a decoded field
@@ -206,7 +206,7 @@ func (d *Decoder) decodeSet(mem MemCache, msg *Message) error {
 			return fmt.Errorf("failed to decodeSet / invalid setID")
 		} else {
 			// Data set
-			var data []DecodedField
+			var data map[ElementKey][]DecodedField
 			if data, err = d.decodeData(tr); err == nil {
 				msg.DataSets = append(msg.DataSets, data)
 			} else {
@@ -505,14 +505,14 @@ func (d *Decoder) getDataLength(fieldSpecifierLen uint16, t FieldType) (uint16, 
 	return readLength, nil
 }
 
-func (d *Decoder) decodeData(tr TemplateRecord) ([]DecodedField, error) {
+func (d *Decoder) decodeData(tr TemplateRecord) (map[ElementKey][]DecodedField, error) {
 	var (
-		fields     []DecodedField
+		fields     map[ElementKey][]DecodedField
 		err        error
 		b          []byte
 		readLength uint16
 	)
-
+	fields = make(map[ElementKey][]DecodedField)
 	r := d.reader
 
 	for i := 0; i < len(tr.ScopeFieldSpecifiers); i++ {
@@ -534,7 +534,8 @@ func (d *Decoder) decodeData(tr TemplateRecord) ([]DecodedField, error) {
 			return nil, err
 		}
 
-		fields = append(fields, DecodedField{
+		eKey := ElementKey{tr.ScopeFieldSpecifiers[i].EnterpriseNo, m.FieldID}
+		fields[eKey] = append(fields[eKey], DecodedField{
 			ID:           m.FieldID,
 			Value:        Interpret(&b, m.Type),
 			EnterpriseNo: tr.ScopeFieldSpecifiers[i].EnterpriseNo,
@@ -560,7 +561,8 @@ func (d *Decoder) decodeData(tr TemplateRecord) ([]DecodedField, error) {
 			return nil, err
 		}
 
-		fields = append(fields, DecodedField{
+		eKey := ElementKey{tr.FieldSpecifiers[i].EnterpriseNo, m.FieldID}
+		fields[eKey] = append(fields[eKey], DecodedField{
 			ID:    m.FieldID,
 			Value: Interpret(&b, m.Type),
 			EnterpriseNo: tr.FieldSpecifiers[i].EnterpriseNo,
