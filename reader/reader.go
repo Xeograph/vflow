@@ -25,7 +25,7 @@ package reader
 
 import (
 	"encoding/binary"
-	"errors"
+	"fmt"
 )
 
 // Reader represents the data bytes for reading
@@ -33,8 +33,6 @@ type Reader struct {
 	data  []byte
 	count int
 }
-
-var errReader = errors.New("can not read the data")
 
 // NewReader constructs a reader
 func NewReader(b []byte) *Reader {
@@ -46,7 +44,7 @@ func NewReader(b []byte) *Reader {
 // Uint8 reads a byte
 func (r *Reader) Uint8() (uint8, error) {
 	if len(r.data) < 1 {
-		return 0, errReader
+		return 0, fmt.Errorf("Error reading Uint8, remaining length: %d", len(r.data))
 	}
 
 	d := r.data[0]
@@ -58,7 +56,7 @@ func (r *Reader) Uint8() (uint8, error) {
 // Uint16 reads two bytes as big-endian
 func (r *Reader) Uint16() (uint16, error) {
 	if len(r.data) < 2 {
-		return 0, errReader
+		return 0, fmt.Errorf("Error reading Uint16, remaining length: %d", len(r.data))
 	}
 
 	d := binary.BigEndian.Uint16(r.data)
@@ -70,7 +68,7 @@ func (r *Reader) Uint16() (uint16, error) {
 // Uint32 reads four bytes as big-endian
 func (r *Reader) Uint32() (uint32, error) {
 	if len(r.data) < 4 {
-		return 0, errReader
+		return 0, fmt.Errorf("Error reading Uint32, remaining length: %d", len(r.data))
 	}
 
 	d := binary.BigEndian.Uint32(r.data)
@@ -82,7 +80,7 @@ func (r *Reader) Uint32() (uint32, error) {
 // Uint64 reads eight bytes as big-endian
 func (r *Reader) Uint64() (uint64, error) {
 	if len(r.data) < 8 {
-		return 0, errReader
+		return 0, fmt.Errorf("Error reading Uint64, remaining length: %d", len(r.data))
 	}
 
 	d := binary.BigEndian.Uint64(r.data)
@@ -94,7 +92,7 @@ func (r *Reader) Uint64() (uint64, error) {
 // Read reads n bytes and returns it
 func (r *Reader) Read(n int) ([]byte, error) {
 	if len(r.data) < n {
-		return []byte{}, errReader
+		return []byte{}, fmt.Errorf("Error reading %d Bytes, remaining length: %d", n, len(r.data))
 	}
 
 	d := r.data[:n]
@@ -115,7 +113,7 @@ func (r *Reader) PeekUint16() (res uint16, err error) {
 // Peek returns the next n bytes in the reader without advancing in the stream
 func (r *Reader) Peek(n int) ([]byte, error) {
 	if len(r.data) < n {
-		return []byte{}, errReader
+		return []byte{}, fmt.Errorf("Error peeking %d Bytes, remaining length: %d", n, len(r.data))
 	}
 	return r.data[:n], nil
 }
