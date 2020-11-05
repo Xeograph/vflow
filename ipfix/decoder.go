@@ -518,10 +518,8 @@ func (d *Decoder) decodeData(tr TemplateRecord) (map[ElementKey][]DecodedField, 
 	for i := 0; i < len(tr.ScopeFieldSpecifiers); i++ {
 		eKey := ElementKey{tr.ScopeFieldSpecifiers[i].EnterpriseNo, tr.ScopeFieldSpecifiers[i].ElementID}
 		m, ok := InfoModel[eKey]
-
 		if !ok {
-			return nil, nonfatalError{fmt.Errorf("IPFIX element key (%d) not exist (scope)",
-				tr.ScopeFieldSpecifiers[i].ElementID)}
+			return nil, nonfatalError{fmt.Errorf("IPFIX element key (%d) not exist (scope)", eKey.ElementID)}
 		}
 
 		if readLength, err = d.getDataLength(tr.ScopeFieldSpecifiers[i].Length, m.Type); err != nil {
@@ -529,13 +527,14 @@ func (d *Decoder) decodeData(tr TemplateRecord) (map[ElementKey][]DecodedField, 
 		}
 
 		if b, err = r.Read(int(readLength)); err != nil {
+			err = fmt.Errorf("Failed to read value of %d_%d: %s", eKey.EnterpriseNo, m.FieldID, err)
 			return nil, err
 		}
 
 		fields[eKey] = append(fields[eKey], DecodedField{
 			ID:           m.FieldID,
 			Value:        Interpret(&b, m.Type),
-			EnterpriseNo: tr.ScopeFieldSpecifiers[i].EnterpriseNo,
+			EnterpriseNo: eKey.EnterpriseNo,
 		})
 	}
 
@@ -544,8 +543,7 @@ func (d *Decoder) decodeData(tr TemplateRecord) (map[ElementKey][]DecodedField, 
 		m, ok := InfoModel[eKey]
 
 		if !ok {
-			return nil, nonfatalError{fmt.Errorf("IPFIX element key (%d) not exist",
-				tr.FieldSpecifiers[i].ElementID)}
+			return nil, nonfatalError{fmt.Errorf("IPFIX element key (%d) not exist", eKey.ElementID)}
 		}
 
 		if readLength, err = d.getDataLength(tr.FieldSpecifiers[i].Length, m.Type); err != nil {
@@ -553,13 +551,14 @@ func (d *Decoder) decodeData(tr TemplateRecord) (map[ElementKey][]DecodedField, 
 		}
 
 		if b, err = r.Read(int(readLength)); err != nil {
+			err = fmt.Errorf("Failed to read value of %d_%d: %s", eKey.EnterpriseNo, m.FieldID, err)
 			return nil, err
 		}
 
 		fields[eKey] = append(fields[eKey], DecodedField{
 			ID:    m.FieldID,
 			Value: Interpret(&b, m.Type),
-			EnterpriseNo: tr.FieldSpecifiers[i].EnterpriseNo,
+			EnterpriseNo: eKey.EnterpriseNo,
 		})
 	}
 
