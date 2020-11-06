@@ -33,7 +33,7 @@ import (
 var errUknownMarshalDataType = errors.New("unknown data type to marshal")
 
 // JSONMarshal encodes IPFIX message
-func (m *Message) JSONMarshal(b *bytes.Buffer) ([]byte, error) {
+func (m *Message) JSONMarshal(b *bytes.Buffer, datasetIndex int) ([]byte, error) {
 	b.WriteString("{")
 
 	// encode agent id
@@ -42,8 +42,8 @@ func (m *Message) JSONMarshal(b *bytes.Buffer) ([]byte, error) {
 	// encode header
 	m.encodeHeader(b)
 
-	// encode data sets
-	if err := m.encodeDataSet(b); err != nil {
+	// encode data set
+	if err := m.encodeDataSet(b, datasetIndex); err != nil {
 		return nil, err
 	}
 
@@ -52,87 +52,46 @@ func (m *Message) JSONMarshal(b *bytes.Buffer) ([]byte, error) {
 	return b.Bytes(), nil
 }
 
-func (m *Message) encodeDataSet(b *bytes.Buffer) error {
+func (m *Message) encodeDataSet(b *bytes.Buffer, i int) error {
 	var (
-		length   int
-		dsLength int
+		num_fields   int
+		num_repeats int
+		counter int
 		err      error
 	)
 
-	b.WriteString("\"DataSets\":")
-	dsLength = len(m.DataSets)
+	num_fields = len(m.DataSets[i])
+	counter = 0
+	b.WriteString("\"Data\":{")
+	for eKey, fields := range m.DataSets[i] {
+		num_repeats = len(fields)
+		counter++
 
-	b.WriteByte('[')
+		b.WriteByte('"')
+		b.WriteString(strconv.FormatInt(int64(eKey.EnterpriseNo), 10))
+		b.WriteByte('_')
+		b.WriteString(strconv.FormatInt(int64(eKey.ElementID), 10))
+		b.WriteString("\":")
 
-	for i := range m.DataSets {
-		length = len(m.DataSets[i])
-
-		b.WriteByte('[')
-		for j := range m.DataSets[i] {
-			b.WriteString("{\"I\":")
-			b.WriteString(strconv.FormatInt(int64(m.DataSets[i][j].ID), 10))
-			b.WriteString(",\"V\":")
-			err = m.writeValue(b, i, j)
-
-			if m.DataSets[i][j].EnterpriseNo != 0 {
-				b.WriteString(",\"E\":")
-				b.WriteString(strconv.FormatInt(int64(m.DataSets[i][j].EnterpriseNo), 10))
-			}
-
-			if j < length-1 {
-				b.WriteString("},")
-			} else {
-				b.WriteByte('}')
-			}
-		}
-
-		if i < dsLength-1 {
-			b.WriteString("],")
+		if num_repeats == 1 {
+			err = m.writeValue(b, eKey, i, 0)
 		} else {
+			b.WriteByte('[')
+			for j := range fields {
+				err = m.writeValue(b, eKey, i, j)
+				if j < num_repeats - 1 {
+					b.WriteByte(',')
+				}
+			}
 			b.WriteByte(']')
 		}
-	}
+		
 
-	b.WriteByte(']')
-
-	return err
-}
-
-func (m *Message) encodeDataSetFlat(b *bytes.Buffer) error {
-	var (
-		length   int
-		dsLength int
-		err      error
-	)
-
-	b.WriteString("\"DataSets\":")
-	dsLength = len(m.DataSets)
-
-	b.WriteByte('[')
-
-	for i := range m.DataSets {
-		length = len(m.DataSets[i])
-
-		b.WriteByte('{')
-		for j := range m.DataSets[i] {
-			b.WriteByte('"')
-			b.WriteString(strconv.FormatInt(int64(m.DataSets[i][j].ID), 10))
-			b.WriteString("\":")
-			err = m.writeValue(b, i, j)
-
-			if j < length-1 {
-				b.WriteByte(',')
-			} else {
-				b.WriteByte('}')
-			}
-		}
-
-		if i < dsLength-1 {
-			b.WriteString(",")
+		if counter < num_fields {
+			b.WriteByte(',')
 		}
 	}
-
-	b.WriteByte(']')
+	b.WriteByte('}')
 
 	return err
 }
@@ -157,47 +116,47 @@ func (m *Message) encodeAgent(b *bytes.Buffer) {
 	b.WriteString("\",")
 }
 
-func (m *Message) writeValue(b *bytes.Buffer, i, j int) error {
-	switch m.DataSets[i][j].Value.(type) {
+func (m *Message) writeValue(b *bytes.Buffer, eKey ElementKey, i, j int) error {
+	switch m.DataSets[i][eKey][j].Value.(type) {
 	case uint:
-		b.WriteString(strconv.FormatUint(uint64(m.DataSets[i][j].Value.(uint)), 10))
+		b.WriteString(strconv.FormatUint(uint64(m.DataSets[i][eKey][j].Value.(uint)), 10))
 	case uint8:
-		b.WriteString(strconv.FormatUint(uint64(m.DataSets[i][j].Value.(uint8)), 10))
+		b.WriteString(strconv.FormatUint(uint64(m.DataSets[i][eKey][j].Value.(uint8)), 10))
 	case uint16:
-		b.WriteString(strconv.FormatUint(uint64(m.DataSets[i][j].Value.(uint16)), 10))
+		b.WriteString(strconv.FormatUint(uint64(m.DataSets[i][eKey][j].Value.(uint16)), 10))
 	case uint32:
-		b.WriteString(strconv.FormatUint(uint64(m.DataSets[i][j].Value.(uint32)), 10))
+		b.WriteString(strconv.FormatUint(uint64(m.DataSets[i][eKey][j].Value.(uint32)), 10))
 	case uint64:
-		b.WriteString(strconv.FormatUint(m.DataSets[i][j].Value.(uint64), 10))
+		b.WriteString(strconv.FormatUint(m.DataSets[i][eKey][j].Value.(uint64), 10))
 	case int:
-		b.WriteString(strconv.FormatInt(int64(m.DataSets[i][j].Value.(int)), 10))
+		b.WriteString(strconv.FormatInt(int64(m.DataSets[i][eKey][j].Value.(int)), 10))
 	case int8:
-		b.WriteString(strconv.FormatInt(int64(m.DataSets[i][j].Value.(int8)), 10))
+		b.WriteString(strconv.FormatInt(int64(m.DataSets[i][eKey][j].Value.(int8)), 10))
 	case int16:
-		b.WriteString(strconv.FormatInt(int64(m.DataSets[i][j].Value.(int16)), 10))
+		b.WriteString(strconv.FormatInt(int64(m.DataSets[i][eKey][j].Value.(int16)), 10))
 	case int32:
-		b.WriteString(strconv.FormatInt(int64(m.DataSets[i][j].Value.(int32)), 10))
+		b.WriteString(strconv.FormatInt(int64(m.DataSets[i][eKey][j].Value.(int32)), 10))
 	case int64:
-		b.WriteString(strconv.FormatInt(m.DataSets[i][j].Value.(int64), 10))
+		b.WriteString(strconv.FormatInt(m.DataSets[i][eKey][j].Value.(int64), 10))
 	case float32:
-		b.WriteString(strconv.FormatFloat(float64(m.DataSets[i][j].Value.(float32)), 'E', -1, 32))
+		b.WriteString(strconv.FormatFloat(float64(m.DataSets[i][eKey][j].Value.(float32)), 'E', -1, 32))
 	case float64:
-		b.WriteString(strconv.FormatFloat(m.DataSets[i][j].Value.(float64), 'E', -1, 64))
+		b.WriteString(strconv.FormatFloat(m.DataSets[i][eKey][j].Value.(float64), 'E', -1, 64))
 	case string:
 		b.WriteByte('"')
-		b.WriteString(m.DataSets[i][j].Value.(string))
+		b.WriteString(m.DataSets[i][eKey][j].Value.(string))
 		b.WriteByte('"')
 	case net.IP:
 		b.WriteByte('"')
-		b.WriteString(m.DataSets[i][j].Value.(net.IP).String())
+		b.WriteString(m.DataSets[i][eKey][j].Value.(net.IP).String())
 		b.WriteByte('"')
 	case net.HardwareAddr:
 		b.WriteByte('"')
-		b.WriteString(m.DataSets[i][j].Value.(net.HardwareAddr).String())
+		b.WriteString(m.DataSets[i][eKey][j].Value.(net.HardwareAddr).String())
 		b.WriteByte('"')
 	case []uint8:
 		b.WriteByte('"')
-		b.WriteString("0x" + hex.EncodeToString(m.DataSets[i][j].Value.([]uint8)))
+		b.WriteString("0x" + hex.EncodeToString(m.DataSets[i][eKey][j].Value.([]uint8)))
 		b.WriteByte('"')
 	default:
 		return errUknownMarshalDataType

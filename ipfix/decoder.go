@@ -74,7 +74,7 @@ type TemplateFieldSpecifier struct {
 type Message struct {
 	AgentID  string
 	Header   MessageHeader
-	DataSets [][]DecodedField
+	DataSets []map[ElementKey][]DecodedField
 }
 
 // DecodedField represents a decoded field
@@ -206,7 +206,7 @@ func (d *Decoder) decodeSet(mem MemCache, msg *Message) error {
 			return fmt.Errorf("failed to decodeSet / invalid setID")
 		} else {
 			// Data set
-			var data []DecodedField
+			var data map[ElementKey][]DecodedField
 			if data, err = d.decodeData(tr); err == nil {
 				msg.DataSets = append(msg.DataSets, data)
 			} else {
@@ -505,25 +505,21 @@ func (d *Decoder) getDataLength(fieldSpecifierLen uint16, t FieldType) (uint16, 
 	return readLength, nil
 }
 
-func (d *Decoder) decodeData(tr TemplateRecord) ([]DecodedField, error) {
+func (d *Decoder) decodeData(tr TemplateRecord) (map[ElementKey][]DecodedField, error) {
 	var (
-		fields     []DecodedField
+		fields     map[ElementKey][]DecodedField
 		err        error
 		b          []byte
 		readLength uint16
 	)
-
+	fields = make(map[ElementKey][]DecodedField)
 	r := d.reader
 
 	for i := 0; i < len(tr.ScopeFieldSpecifiers); i++ {
-		m, ok := InfoModel[ElementKey{
-			tr.ScopeFieldSpecifiers[i].EnterpriseNo,
-			tr.ScopeFieldSpecifiers[i].ElementID,
-		}]
-
+		eKey := ElementKey{tr.ScopeFieldSpecifiers[i].EnterpriseNo, tr.ScopeFieldSpecifiers[i].ElementID}
+		m, ok := InfoModel[eKey]
 		if !ok {
-			return nil, nonfatalError{fmt.Errorf("IPFIX element key (%d) not exist (scope)",
-				tr.ScopeFieldSpecifiers[i].ElementID)}
+			return nil, nonfatalError{fmt.Errorf("IPFIX element key (%d) not exist (scope)", eKey.ElementID)}
 		}
 
 		if readLength, err = d.getDataLength(tr.ScopeFieldSpecifiers[i].Length, m.Type); err != nil {
@@ -531,25 +527,23 @@ func (d *Decoder) decodeData(tr TemplateRecord) ([]DecodedField, error) {
 		}
 
 		if b, err = r.Read(int(readLength)); err != nil {
+			err = fmt.Errorf("Failed to read value of %d_%d: %s", eKey.EnterpriseNo, m.FieldID, err)
 			return nil, err
 		}
 
-		fields = append(fields, DecodedField{
+		fields[eKey] = append(fields[eKey], DecodedField{
 			ID:           m.FieldID,
 			Value:        Interpret(&b, m.Type),
-			EnterpriseNo: tr.ScopeFieldSpecifiers[i].EnterpriseNo,
+			EnterpriseNo: eKey.EnterpriseNo,
 		})
 	}
 
 	for i := 0; i < len(tr.FieldSpecifiers); i++ {
-		m, ok := InfoModel[ElementKey{
-			tr.FieldSpecifiers[i].EnterpriseNo,
-			tr.FieldSpecifiers[i].ElementID,
-		}]
+		eKey := ElementKey{tr.FieldSpecifiers[i].EnterpriseNo, tr.FieldSpecifiers[i].ElementID}
+		m, ok := InfoModel[eKey]
 
 		if !ok {
-			return nil, nonfatalError{fmt.Errorf("IPFIX element key (%d) not exist",
-				tr.FieldSpecifiers[i].ElementID)}
+			return nil, nonfatalError{fmt.Errorf("IPFIX element key (%d) not exist", eKey.ElementID)}
 		}
 
 		if readLength, err = d.getDataLength(tr.FieldSpecifiers[i].Length, m.Type); err != nil {
@@ -557,12 +551,14 @@ func (d *Decoder) decodeData(tr TemplateRecord) ([]DecodedField, error) {
 		}
 
 		if b, err = r.Read(int(readLength)); err != nil {
+			err = fmt.Errorf("Failed to read value of %d_%d: %s", eKey.EnterpriseNo, m.FieldID, err)
 			return nil, err
 		}
 
-		fields = append(fields, DecodedField{
+		fields[eKey] = append(fields[eKey], DecodedField{
 			ID:    m.FieldID,
 			Value: Interpret(&b, m.Type),
+			EnterpriseNo: eKey.EnterpriseNo,
 		})
 	}
 

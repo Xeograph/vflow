@@ -125,6 +125,9 @@ func (k *KafkaSarama) setup(configFile string, logger *log.Logger) error {
 		logger.Fatal(err)
 	}
 
+	// TODO this is somewhat hacky, I'd like to make it a config property one day
+	config.Version = sarama.V0_10_0_0
+
 	k.producer, err = sarama.NewAsyncProducer(k.config.Brokers, config)
 	if err != nil {
 		return err
