@@ -330,11 +330,8 @@ func (d *Decoder) decodeData(tr TemplateRecord) ([]DecodedField, error) {
 			return nil, err
 		}
 
-		m, ok := ipfix.InfoModel[ipfix.ElementKey{
-			0,
-			tr.ScopeFieldSpecifiers[i].ElementID,
-		}]
-
+		eKey := ipfix.ElementKey{EnterpriseNo: 0, ElementID: tr.ScopeFieldSpecifiers[i].ElementID}
+		m, ok := ipfix.InfoModel[eKey]
 		if !ok {
 			return nil, nonfatalError(fmt.Errorf("Netflow element key (%d) not exist (scope)",
 				tr.ScopeFieldSpecifiers[i].ElementID))
@@ -342,7 +339,7 @@ func (d *Decoder) decodeData(tr TemplateRecord) ([]DecodedField, error) {
 
 		fields = append(fields, DecodedField{
 			ID:    m.FieldID,
-			Value: ipfix.Interpret(&b, m.Type),
+			Value: ipfix.Interpret(&b, m.Type, &eKey),
 		})
 	}
 
@@ -352,11 +349,8 @@ func (d *Decoder) decodeData(tr TemplateRecord) ([]DecodedField, error) {
 			return nil, err
 		}
 
-		m, ok := ipfix.InfoModel[ipfix.ElementKey{
-			0,
-			tr.FieldSpecifiers[i].ElementID,
-		}]
-
+		eKey := ipfix.ElementKey{EnterpriseNo: 0, ElementID: tr.FieldSpecifiers[i].ElementID}
+		m, ok := ipfix.InfoModel[eKey]
 		if !ok {
 			return nil, nonfatalError(fmt.Errorf("Netflow element key (%d) not exist",
 				tr.FieldSpecifiers[i].ElementID))
@@ -364,7 +358,7 @@ func (d *Decoder) decodeData(tr TemplateRecord) ([]DecodedField, error) {
 
 		fields = append(fields, DecodedField{
 			ID:    m.FieldID,
-			Value: ipfix.Interpret(&b, m.Type),
+			Value: ipfix.Interpret(&b, m.Type, &eKey),
 		})
 	}
 
