@@ -25,6 +25,7 @@ package ipfix
 import (
 	"bytes"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"net"
 	"strconv"
@@ -71,6 +72,11 @@ func (m *Message) encodeDataSet(b *bytes.Buffer, i int) error {
 		b.WriteString(strconv.FormatInt(int64(eKey.EnterpriseNo), 10))
 		b.WriteByte('_')
 		b.WriteString(strconv.FormatInt(int64(eKey.ElementID), 10))
+		if eKey.MultiTypeID != 0 {
+			// Specify that this value is not the default type for its multi-type field
+			b.WriteByte('_')
+			b.WriteString(strconv.FormatInt(int64(eKey.MultiTypeID), 10))
+		}
 		b.WriteString("\":")
 
 		if num_repeats == 1 {
@@ -117,46 +123,49 @@ func (m *Message) encodeAgent(b *bytes.Buffer) {
 }
 
 func (m *Message) writeValue(b *bytes.Buffer, eKey ElementKey, i, j int) error {
-	switch m.DataSets[i][eKey][j].Value.(type) {
+	val := m.DataSets[i][eKey][j].Value
+	switch val.(type) {
 	case uint:
-		b.WriteString(strconv.FormatUint(uint64(m.DataSets[i][eKey][j].Value.(uint)), 10))
+		b.WriteString(strconv.FormatUint(uint64(val.(uint)), 10))
 	case uint8:
-		b.WriteString(strconv.FormatUint(uint64(m.DataSets[i][eKey][j].Value.(uint8)), 10))
+		b.WriteString(strconv.FormatUint(uint64(val.(uint8)), 10))
 	case uint16:
-		b.WriteString(strconv.FormatUint(uint64(m.DataSets[i][eKey][j].Value.(uint16)), 10))
+		b.WriteString(strconv.FormatUint(uint64(val.(uint16)), 10))
 	case uint32:
-		b.WriteString(strconv.FormatUint(uint64(m.DataSets[i][eKey][j].Value.(uint32)), 10))
+		b.WriteString(strconv.FormatUint(uint64(val.(uint32)), 10))
 	case uint64:
-		b.WriteString(strconv.FormatUint(m.DataSets[i][eKey][j].Value.(uint64), 10))
+		b.WriteString(strconv.FormatUint(val.(uint64), 10))
 	case int:
-		b.WriteString(strconv.FormatInt(int64(m.DataSets[i][eKey][j].Value.(int)), 10))
+		b.WriteString(strconv.FormatInt(int64(val.(int)), 10))
 	case int8:
-		b.WriteString(strconv.FormatInt(int64(m.DataSets[i][eKey][j].Value.(int8)), 10))
+		b.WriteString(strconv.FormatInt(int64(val.(int8)), 10))
 	case int16:
-		b.WriteString(strconv.FormatInt(int64(m.DataSets[i][eKey][j].Value.(int16)), 10))
+		b.WriteString(strconv.FormatInt(int64(val.(int16)), 10))
 	case int32:
-		b.WriteString(strconv.FormatInt(int64(m.DataSets[i][eKey][j].Value.(int32)), 10))
+		b.WriteString(strconv.FormatInt(int64(val.(int32)), 10))
 	case int64:
-		b.WriteString(strconv.FormatInt(m.DataSets[i][eKey][j].Value.(int64), 10))
+		b.WriteString(strconv.FormatInt(val.(int64), 10))
 	case float32:
-		b.WriteString(strconv.FormatFloat(float64(m.DataSets[i][eKey][j].Value.(float32)), 'E', -1, 32))
+		b.WriteString(strconv.FormatFloat(float64(val.(float32)), 'E', -1, 32))
 	case float64:
-		b.WriteString(strconv.FormatFloat(m.DataSets[i][eKey][j].Value.(float64), 'E', -1, 64))
+		b.WriteString(strconv.FormatFloat(val.(float64), 'E', -1, 64))
 	case string:
-		b.WriteByte('"')
-		b.WriteString(m.DataSets[i][eKey][j].Value.(string))
-		b.WriteByte('"')
+		bytes, err := json.Marshal(val.(string))
+		if err != nil {
+			return err
+		}
+		b.Write(bytes)
 	case net.IP:
 		b.WriteByte('"')
-		b.WriteString(m.DataSets[i][eKey][j].Value.(net.IP).String())
+		b.WriteString(val.(net.IP).String())
 		b.WriteByte('"')
 	case net.HardwareAddr:
 		b.WriteByte('"')
-		b.WriteString(m.DataSets[i][eKey][j].Value.(net.HardwareAddr).String())
+		b.WriteString(val.(net.HardwareAddr).String())
 		b.WriteByte('"')
 	case []uint8:
 		b.WriteByte('"')
-		b.WriteString("0x" + hex.EncodeToString(m.DataSets[i][eKey][j].Value.([]uint8)))
+		b.WriteString("0x" + hex.EncodeToString(val.([]uint8)))
 		b.WriteByte('"')
 	default:
 		return errUknownMarshalDataType

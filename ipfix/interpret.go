@@ -29,7 +29,7 @@ import (
 )
 
 // Interpret read data fields based on the type - big endian
-func Interpret(b *[]byte, t FieldType) interface{} {
+func Interpret(b *[]byte, t FieldType, eKey *ElementKey) interface{} {
 	if len(*b) < t.minLen() {
 		return *b
 	}
@@ -69,6 +69,14 @@ func Interpret(b *[]byte, t FieldType) interface{} {
 		return binary.BigEndian.Uint64(*b)
 	case Unknown, OctetArray:
 		return *b
+	// Begin custom types
+	case Ipv4OrString:
+		if len(*b) == 4 {
+			eKey.MultiTypeID = 1
+			return net.IP(*b)
+		} else {
+			return string(*b)
+		}
 	}
 	return *b
 }

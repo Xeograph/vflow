@@ -487,7 +487,7 @@ func (d *Decoder) getDataLength(fieldSpecifierLen uint16, t FieldType) (uint16, 
 
 	r := d.reader
 
-	if (t == String || t == OctetArray) && (fieldSpecifierLen == 65535) {
+	if t.isVariableLength() && (fieldSpecifierLen == 65535) {
 		var len8 uint8
 		if len8, err = r.Uint8(); err != nil {
 			return 0, err
@@ -516,7 +516,8 @@ func (d *Decoder) decodeData(tr TemplateRecord) (map[ElementKey][]DecodedField, 
 	r := d.reader
 
 	for i := 0; i < len(tr.ScopeFieldSpecifiers); i++ {
-		eKey := ElementKey{tr.ScopeFieldSpecifiers[i].EnterpriseNo, tr.ScopeFieldSpecifiers[i].ElementID}
+		eKey := ElementKey{EnterpriseNo: tr.ScopeFieldSpecifiers[i].EnterpriseNo, 
+			               ElementID: tr.ScopeFieldSpecifiers[i].ElementID}
 		m, ok := InfoModel[eKey]
 		if !ok {
 			return nil, nonfatalError{fmt.Errorf("IPFIX element key (%d) not exist (scope)", eKey.ElementID)}
@@ -531,17 +532,18 @@ func (d *Decoder) decodeData(tr TemplateRecord) (map[ElementKey][]DecodedField, 
 			return nil, err
 		}
 
+		value := Interpret(&b, m.Type, &eKey)
 		fields[eKey] = append(fields[eKey], DecodedField{
-			ID:           m.FieldID,
-			Value:        Interpret(&b, m.Type),
+			ID:    m.FieldID,
+			Value: value,
 			EnterpriseNo: eKey.EnterpriseNo,
 		})
 	}
 
 	for i := 0; i < len(tr.FieldSpecifiers); i++ {
-		eKey := ElementKey{tr.FieldSpecifiers[i].EnterpriseNo, tr.FieldSpecifiers[i].ElementID}
+		eKey := ElementKey{EnterpriseNo: tr.FieldSpecifiers[i].EnterpriseNo, 
+			               ElementID: tr.FieldSpecifiers[i].ElementID}
 		m, ok := InfoModel[eKey]
-
 		if !ok {
 			return nil, nonfatalError{fmt.Errorf("IPFIX element key (%d) not exist", eKey.ElementID)}
 		}
@@ -555,9 +557,10 @@ func (d *Decoder) decodeData(tr TemplateRecord) (map[ElementKey][]DecodedField, 
 			return nil, err
 		}
 
+		value := Interpret(&b, m.Type, &eKey)
 		fields[eKey] = append(fields[eKey], DecodedField{
 			ID:    m.FieldID,
-			Value: Interpret(&b, m.Type),
+			Value: value,
 			EnterpriseNo: eKey.EnterpriseNo,
 		})
 	}
