@@ -61,10 +61,20 @@ func (m *Message) encodeDataSet(b *bytes.Buffer, i int) error {
 		err      error
 	)
 
-	num_fields = len(m.DataSets[i])
+	data_set := m.DataSets[i]
+
+	// This is a hack for the purple project to remove icmptype and icmpcode when ipprotocol != 1
+	ip_protocol, ok := data_set[ElementKey{EnterpriseNo: 0, ElementID: 4}]
+	if !ok || ip_protocol[0].Value.(uint8) != 1 {
+		delete(data_set, ElementKey{EnterpriseNo: 0, ElementID: 176})
+		delete(data_set, ElementKey{EnterpriseNo: 0, ElementID: 177})
+	}
+	// End hack
+
+	num_fields = len(data_set)
 	counter = 0
 	b.WriteString("\"Data\":{")
-	for eKey, fields := range m.DataSets[i] {
+	for eKey, fields := range data_set {
 		num_repeats = len(fields)
 		counter++
 
