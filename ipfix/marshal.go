@@ -55,10 +55,10 @@ func (m *Message) JSONMarshal(b *bytes.Buffer, datasetIndex int) ([]byte, error)
 
 func (m *Message) encodeDataSet(b *bytes.Buffer, i int) error {
 	var (
-		num_fields   int
+		num_fields int
 		num_repeats int
 		counter int
-		err      error
+		err error
 	)
 
 	data_set := m.DataSets[i]
@@ -90,11 +90,23 @@ func (m *Message) encodeDataSet(b *bytes.Buffer, i int) error {
 		b.WriteString("\":")
 
 		if num_repeats == 1 {
-			err = m.writeValue(b, eKey, i, 0)
+			err = m.writeValue(b, fields[0].Value)
 		} else {
+
+			var filtered_values []interface{}
+			for _, field := range fields {
+				// don't write empty string vlues in arrays
+				if s_val, ok := field.Value.(string); ok && len(s_val) == 0 {
+					num_repeats -= 1
+					continue
+				}
+				filtered_values = append(filtered_values, field.Value)
+			}
+
 			b.WriteByte('[')
-			for j := range fields {
-				err = m.writeValue(b, eKey, i, j)
+			for j, val := range filtered_values {
+
+				err = m.writeValue(b, val)
 				if j < num_repeats - 1 {
 					b.WriteByte(',')
 				}
@@ -132,8 +144,7 @@ func (m *Message) encodeAgent(b *bytes.Buffer) {
 	b.WriteString("\",")
 }
 
-func (m *Message) writeValue(b *bytes.Buffer, eKey ElementKey, i, j int) error {
-	val := m.DataSets[i][eKey][j].Value
+func (m *Message) writeValue(b *bytes.Buffer, val interface{}) error {
 	switch val.(type) {
 	case uint:
 		b.WriteString(strconv.FormatUint(uint64(val.(uint)), 10))
